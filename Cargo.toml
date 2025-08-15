@@ -22,4 +22,4 @@ edition = "2024"
 authors = ["MKJS Tech (P) Ltd"]
 
 [workspace.dependencies]
-log-args-runtime = { path = "./log-args-runtime" }
+log-args-runtime = { version = "0.1.2", features = ["with_context"] }
