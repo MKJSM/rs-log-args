@@ -1,0 +1,46 @@
+[package]
+name = "log_args"
+version = "0.1.5"
+edition = "2021"
+autotests = false
+authors = ["JS <mkjsm57@gmail.com>"]
+description = "A simple procedural macro to log function arguments using the tracing crate."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/MKJSM/log-args"
+repository = "https://github.com/MKJSM/log-args"
+rust-version = "1.65"
+keywords = ["logging", "tracing", "macro", "proc-macro", "arguments"]
+categories = [
+    "development-tools::debugging",
+    "development-tools::procedural-macro-helpers",
+]
+
+[lib]
+proc-macro = true
+
+[features]
+default = []
+# Function name logging with different casing styles
+function-names-snake = []     # snake_case (original function name)
+function-names-camel = []     # camelCase (first letter lowercase)
+function-names-pascal = []    # PascalCase (first letter uppercase)
+function-names-screaming = [] # SCREAMING_SNAKE_CASE
+function-names-kebab = []     # kebab-case
+# Backward compatibility alias
+function-names = ["function-names-pascal"]
+with_context = []
+
+[dependencies]
+syn = { version = "2.0.104", features = ["full"] }
+quote = "1.0.40"
+proc-macro2 = "1.0.95"
+log-args-runtime.workspace = true
+
+[dev-dependencies]
+futures = "0.3.31"
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
