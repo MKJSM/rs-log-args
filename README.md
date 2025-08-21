@@ -42,8 +42,8 @@ Add both crates to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-log_args = "0.1.4"
-log-args-runtime = { version = "0.1.2", features = ["with_context"] }
+log_args = "0.1.6"
+log-args-runtime = { version = "0.1.4", features = ["with_context"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json"] }
 ```
@@ -74,11 +74,11 @@ fn process_user(username: String, password: String) {
     validate_credentials(username, password);
 }
 
-// Selective parameter logging
-#[params(fields(username))]
+// Span context propagation - child functions inherit context
+#[params(span(username))]
 fn validate_credentials(username: String, password: String) {
     info!("Validating credentials");
-    // Individual span fields appear in JSON output: {"username": "john_doe"}
+    // Child functions automatically inherit username context
 }
 ```
 
@@ -113,11 +113,11 @@ Run the included examples to see the features in action:
 # Basic usage
 cargo run --example basic_usage
 
-# Selective field logging
-cargo run --example selective_fields
-
 # Context propagation across async boundaries
 cargo run --example span_propagation
+
+# Selective field logging
+cargo run --example selective_fields
 
 # Custom fields and metadata
 cargo run --example custom_fields

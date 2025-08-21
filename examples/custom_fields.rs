@@ -11,7 +11,7 @@ fn init_subscriber() {
 
 // Add custom static fields alongside parameters
 #[params(custom(service = "orders", version = "v1"))]
-fn create_order(order_id: String, user_id: String) {
+fn create_order(_order_id: String, _user_id: String) {
     info!("Created order");
 }
 

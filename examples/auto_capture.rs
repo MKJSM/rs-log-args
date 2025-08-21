@@ -26,12 +26,14 @@ fn main() {
     init_subscriber();
 
     // Seed context manually (e.g., from middleware) and call functions
-    let _guard = push_context([
-        ("tenant_id".to_string(), "acme".to_string()),
-        ("session_id".to_string(), "sess-123".to_string()),
-    ]
-    .into_iter()
-    .collect());
+    let _guard = push_context(
+        [
+            ("tenant_id".to_string(), "acme".to_string()),
+            ("session_id".to_string(), "sess-123".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+    );
 
     mid();
 }

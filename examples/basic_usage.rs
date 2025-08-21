@@ -12,7 +12,7 @@ fn init_subscriber() {
 }
 
 #[params]
-fn greet(name: String) {
+fn greet(_name: String) {
     info!("Greeting user");
 }
 

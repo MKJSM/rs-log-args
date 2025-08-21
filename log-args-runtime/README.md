@@ -19,7 +19,7 @@ Runtime support crate for the [`log_args`](../log_args/) procedural macros, prov
 
 ```toml
 [dependencies]
-log-args-runtime = { version = "0.1.2", features = ["with_context"] }
+log-args-runtime = { version = "0.1.4", features = ["with_context"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json"] }
 ```

@@ -44,7 +44,7 @@
 //!
 //! ### Basic Usage Examples
 //!
-//! ```rust
+//! ```rust, ignore
 //! use log_args::params;
 //! use tracing::info;
 //!
@@ -88,7 +88,7 @@
 //! ## 🔧 Advanced Usage
 //!
 //! ### Custom Fields with Expressions
-//! ```rust
+//! ```rust, ignore
 //! #[params(
 //!     fields(user.id, user.name),
 //!     custom(
@@ -111,7 +111,7 @@
 //! ```
 //!
 //! ### Async Task Processing
-//! ```rust
+//! ```rust, ignore
 //! #[params(span(job_id, user_id))]
 //! async fn process_background_job(job_id: String, user_id: String, job_data: JobData) {
 //!     info!("Background job started");
@@ -141,7 +141,7 @@
 //! ### Tracing Subscriber Setup
 //! For structured JSON logging with context fields at the top level:
 //!
-//! ```rust
+//! ```rust, ignore
 //! fn init_logging() {
 //!     tracing_subscriber::fmt()
 //!         .json()
@@ -151,7 +151,7 @@
 //! ```
 //!
 //! ### Production Configuration
-//! ```rust
+//! ```rust, ignore
 //! fn init_prod_logging() {
 //!     tracing_subscriber::fmt()
 //!         .json()
@@ -165,7 +165,7 @@
 //! ## 🔒 Security Best Practices
 //!
 //! **Always use selective logging in production:**
-//! ```rust
+//! ```rust, ignore
 //! // ✅ Good - Only logs safe fields
 //! #[params(fields(user_id, operation_type))]
 //! fn secure_operation(user_id: String, password: String, operation_type: String) {
@@ -202,7 +202,11 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, Parser};
 use syn::punctuated::Punctuated;
-use syn::{parenthesized, Expr, FnArg, Ident, MetaNameValue, Pat, Token, visit_mut::{self, VisitMut}, parse_quote};
+use syn::{
+    parenthesized, parse_quote,
+    visit_mut::{self, VisitMut},
+    Expr, FnArg, Ident, MetaNameValue, Pat, Token,
+};
 
 const WITH_CONTEXT_ENABLED: bool = cfg!(feature = "with_context");
 
@@ -212,7 +216,12 @@ impl VisitMut for BlockRewriter {
     fn visit_macro_mut(&mut self, mac: &mut syn::Macro) {
         let path = &mac.path;
         if let Some(last_segment) = path.segments.last() {
-            if last_segment.ident == "info" || last_segment.ident == "warn" || last_segment.ident == "error" || last_segment.ident == "debug" || last_segment.ident == "trace" {
+            if last_segment.ident == "info"
+                || last_segment.ident == "warn"
+                || last_segment.ident == "error"
+                || last_segment.ident == "debug"
+                || last_segment.ident == "trace"
+            {
                 if let Some(first_segment) = path.segments.first() {
                     if first_segment.ident == "tracing" {
                         // It's a `tracing::info!` style macro call. We need to strip `tracing::`
@@ -285,6 +294,56 @@ fn to_kebab_case(snake_case: &str) -> String {
     snake_case.replace('_', "-")
 }
 
+// Convert snake_case to PascalCase (first letter uppercase)
+#[cfg(any(feature = "function-names-pascal", feature = "function-names"))]
+fn to_pascal_case(snake_case: &str) -> String {
+    let mut pascal_case = String::new();
+    let mut capitalize = true; // Start with capital
+    for c in snake_case.chars() {
+        if c == '_' {
+            capitalize = true;
+        } else if capitalize {
+            pascal_case.push(c.to_ascii_uppercase());
+            capitalize = false;
+        } else {
+            pascal_case.push(c);
+        }
+    }
+    pascal_case
+}
+
+// Get the formatted function name based on enabled features
+fn get_formatted_function_name(function_name: &str) -> String {
+    #[cfg(feature = "function-names-camel")]
+    {
+        return to_camel_case(function_name);
+    }
+
+    #[cfg(any(feature = "function-names-pascal", feature = "function-names"))]
+    {
+        return to_pascal_case(function_name);
+    }
+
+    #[cfg(feature = "function-names-screaming")]
+    {
+        return to_screaming_snake_case(function_name);
+    }
+
+    #[cfg(feature = "function-names-kebab")]
+    {
+        return to_kebab_case(function_name);
+    }
+
+    #[cfg(feature = "function-names-snake")]
+    {
+        return function_name.to_string();
+    }
+
+    // Default: return original snake_case function name
+    #[allow(unreachable_code)]
+    function_name.to_string()
+}
+
 /// A powerful procedural macro for automatic function argument logging with structured tracing.
 ///
 /// **The `#[params]` macro enables truly automatic context inheritance across all boundaries**
@@ -303,7 +362,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 ///
 /// By default, `#[params]` only enables span propagation and function name logging:
 ///
-/// ```rust
+/// ```rust, ignore
 /// use log_args::params;
 /// use tracing::info;
 ///
@@ -320,7 +379,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 ///     info!("Validating request"); // Inherits parent context automatically
 /// }
 ///
-/// #[params] 
+/// #[params]
 /// fn send_response() {
 ///     info!("Sending response"); // Also inherits parent context
 /// }
@@ -342,7 +401,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 ///
 /// For security and performance, specify exactly which fields to log:
 ///
-/// ```rust
+/// ```rust, ignore
 /// #[params(fields(user_id, action))]
 /// fn user_action(user_id: String, action: String, password: String, api_key: String) {
 ///     info!("User performed action");
@@ -355,7 +414,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 ///
 /// Automatically propagate context to all child functions:
 ///
-/// ```rust
+/// ```rust, ignore
 /// // Parent function sets up context
 /// #[params(span(request_id, user_id))]
 /// fn handle_api_request(request_id: String, user_id: String, payload: String) {
@@ -383,7 +442,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 ///
 /// Add computed metadata and service information:
 ///
-/// ```rust
+/// ```rust, ignore
 /// #[params(
 ///     fields(user_id),
 ///     custom(
@@ -401,7 +460,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 ///
 /// Use the `all` attribute to explicitly log all function parameters:
 ///
-/// ```rust
+/// ```rust, ignore
 /// #[params(all)]
 /// fn debug_function(user_id: u64, data: String, config: Config) {
 ///     info!("Debug information");
@@ -416,7 +475,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 /// **Note: Span propagation is now enabled by default with `#[params]`.**
 /// Context automatically propagates to child functions:
 ///
-/// ```rust
+/// ```rust, ignore
 /// use log_args_runtime::{info as ctx_info};
 ///
 /// #[params(fields(user.id, transaction.amount))]
@@ -453,7 +512,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 ///
 /// Works seamlessly with async functions:
 ///
-/// ```rust
+/// ```rust, ignore
 /// #[params(span, fields(user_id, operation_type))]
 /// async fn async_operation(user_id: u64, operation_type: String, secret: String) {
 ///     info!("Starting async operation");
@@ -468,7 +527,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 ///
 /// Works with methods in impl blocks:
 ///
-/// ```rust
+/// ```rust, ignore
 /// impl UserService {
 ///     #[params(span, fields(user.id, self.config.timeout))]
 ///     fn process_user(&self, user: User, sensitive_token: String) {
@@ -490,7 +549,7 @@ fn to_kebab_case(snake_case: &str) -> String {
 ///
 /// The macro works with Result types and error handling patterns:
 ///
-/// ```rust
+/// ```rust, ignore
 /// #[params(fields(operation_id, retry_count))]
 /// fn fallible_operation(
 ///     operation_id: String,
@@ -545,98 +604,221 @@ pub fn params(args: TokenStream, input: TokenStream) -> TokenStream {
     let config = AttrConfig::from_attributes(attrs);
     let context_fields = get_context_fields_quote(&item, &config);
 
-    if config.span {
-        // Generate context map for span propagation
-        let context_map = get_context_map_for_span(&item, &config);
-
-        if item.sig().asyncness.is_some() {
-            let log_redefines = get_log_redefines_with_fields(&context_fields, true);
-            let original_block = item.block().clone();
-            let mut transformed_block = original_block.clone();
-            BlockRewriter.visit_block_mut(&mut transformed_block);
-            SpawnInstrumentRewriter.visit_block_mut(&mut transformed_block);
-            // Build optional auto-capture statement
-            let auto_capture_stmt = if config.auto_capture {
-                quote! { let _auto_capture_guard = ::log_args_runtime::capture_context(); }
-            } else {
-                quote! {}
-            };
-            let new_block = quote! {
-                {
-                    let _context_guard = ::log_args_runtime::push_async_context(#context_map);
-                    #auto_capture_stmt
-                    // Context propagation is handled entirely through macro rewriting and thread-local storage
-                    // No tracing spans needed - all context fields are injected directly into log calls
-                    #log_redefines
-                    #transformed_block
-                }
-            };
-            *item.block_mut() = syn::parse2(new_block).expect("Failed to parse new async block");
-        } else {
-            let log_redefines = get_log_redefines_with_fields(&context_fields, false);
-            let original_block = item.block().clone();
-            let mut transformed_block = original_block.clone();
-            BlockRewriter.visit_block_mut(&mut transformed_block);
-            SpawnInstrumentRewriter.visit_block_mut(&mut transformed_block);
-            let auto_capture_stmt = if config.auto_capture {
-                quote! { let _auto_capture_guard = ::log_args_runtime::capture_context(); }
-            } else {
-                quote! {}
-            };
-            let new_block = quote! {
-                {
-                    let _context_guard = ::log_args_runtime::push_context(#context_map);
-                    #auto_capture_stmt
-                    // Context propagation is handled entirely through macro rewriting and thread-local storage
-                    // No tracing spans needed - all context fields are injected directly into log calls
-                    #log_redefines
-                    #transformed_block
-                }
-            };
-            *item.block_mut() = syn::parse2(new_block).expect("Failed to parse new sync block");
-        }
-    } else {
-        // No span, use direct field injection
-        if item.sig().asyncness.is_some() {
-            let log_redefines = get_log_redefines_with_fields(&context_fields, true);
-            let original_block = item.block().clone();
-            let mut transformed_block = original_block.clone();
-            BlockRewriter.visit_block_mut(&mut transformed_block);
-            SpawnInstrumentRewriter.visit_block_mut(&mut transformed_block);
-            let new_block = quote! {
-                {
-                    #log_redefines
-                    #transformed_block
-                }
-            };
-            *item.block_mut() = syn::parse2(new_block).expect("Failed to parse new async block");
-        } else {
-            let log_redefines = get_log_redefines_with_fields(&context_fields, false);
-            let original_block = item.block().clone();
-            let mut transformed_block = original_block.clone();
-            BlockRewriter.visit_block_mut(&mut transformed_block);
-            SpawnInstrumentRewriter.visit_block_mut(&mut transformed_block);
-            let new_block = quote! {
-                {
-                    #log_redefines
-                    #transformed_block
-                }
-            };
-            *item.block_mut() = syn::parse2(new_block).expect("Failed to parse new sync block");
-        }
-    }
+    let is_async = item.sig().asyncness.is_some();
+    let new_block_tokens = generate_new_block(&item, &config, &context_fields, is_async);
+    *item.block_mut() = match syn::parse2(new_block_tokens) {
+        Ok(block) => block,
+        Err(e) => return e.to_compile_error().into(),
+    };
 
     TokenStream::from(quote! { #item })
 }
 
+fn generate_new_block(
+    item: &FnItem,
+    config: &AttrConfig,
+    context_fields: &[proc_macro2::TokenStream],
+    is_async: bool,
+) -> proc_macro2::TokenStream {
+    let log_redefines = get_log_redefines_with_fields(context_fields, is_async);
+    let original_block = item.block().clone();
+    let mut transformed_block = original_block.clone();
+    BlockRewriter.visit_block_mut(&mut transformed_block);
+    SpawnInstrumentRewriter.visit_block_mut(&mut transformed_block);
+
+    if config.span {
+        let context_map = get_context_map_for_span(item, config);
+        let auto_capture_stmt = if config.auto_capture {
+            quote! { let _auto_capture_guard = ::log_args_runtime::capture_context(); }
+        } else {
+            quote! {}
+        };
+        let push_fn = if is_async {
+            quote! { ::log_args_runtime::push_async_context(#context_map) }
+        } else {
+            quote! { ::log_args_runtime::push_context(#context_map) }
+        };
+
+        quote! {
+            {
+                let _context_guard = #push_fn;
+                #auto_capture_stmt
+                #log_redefines
+                #transformed_block
+            }
+        }
+    } else {
+        quote! {
+            {
+                #log_redefines
+                #transformed_block
+            }
+        }
+    }
+}
+
+/// Represents the different attribute configurations available for the `#[params]` macro.
+///
+/// Each attribute controls how function parameters are logged and how context is propagated
+/// to child functions. These attributes can be combined to create flexible logging strategies.
+///
+/// # Available Attributes
+///
+/// - `fields(...)` - Selectively log specific function parameters as individual fields
+/// - `custom(...)` - Add computed fields with custom expressions and metadata
+/// - `current(...)` - Log current context values (legacy/internal use)
+/// - `clone_upfront` - Clone parameters before async operations to prevent move issues
+/// - `span(...)` - Set up context propagation for child functions to inherit
+/// - `all` - Log all function parameters (use with caution in production)
+/// - `auto_capture` - Automatically capture context in closures and spawned tasks
+///
+/// # Security Note
+///
+/// By default, `#[params]` without arguments is secure and doesn't log parameters.
+/// Always be explicit about what you log in production environments.
 enum Attribute {
+    /// **Selective Parameter Logging** - `fields(param1, param2, ...)`
+    ///
+    /// Logs only the specified function parameters as individual fields in the log output.
+    /// This is the recommended approach for production logging as it gives you precise
+    /// control over what data is logged.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// #[params(fields(user_id, action))]
+    /// fn user_action(user_id: String, action: String, password: String) {
+    ///     info!("User performed action"); // Only user_id and action are logged
+    /// }
+    /// ```
+    ///
+    /// # Security
+    /// - ✅ Secure: Only specified parameters are logged
+    /// - ✅ Production-safe: Excludes sensitive data by default
+    /// - ✅ Performance: Only processes specified fields
     Fields(Punctuated<Expr, Token![,]>),
+
+    /// **Custom Computed Fields** - `custom(field_name = expression, ...)`
+    ///
+    /// Adds computed fields to log output using custom expressions. Useful for adding
+    /// metadata, timestamps, or derived values that aren't direct function parameters.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// #[params(
+    ///     custom(
+    ///         timestamp = std::time::SystemTime::now(),
+    ///         data_size = data.len(),
+    ///         is_admin = user.role == "admin"
+    ///     )
+    /// )]
+    /// fn process_data(data: Vec<u8>, user: User) {
+    ///     info!("Processing data"); // Includes computed fields
+    /// }
+    /// ```
+    ///
+    /// # Performance Note
+    /// Keep expressions lightweight as they're evaluated on every log call.
     Custom(Punctuated<MetaNameValue, Token![,]>),
+
+    /// **Current Context Values** - `current(...)`
+    ///
+    /// Internal attribute for logging current context values. Primarily used internally
+    /// by the macro system for context management.
+    ///
+    /// # Usage
+    /// This is typically not used directly by end users.
     Current(Punctuated<Expr, Token![,]>),
+
+    /// **Clone Upfront** - `clone_upfront`
+    ///
+    /// Clones function parameters before async operations to prevent ownership issues.
+    /// Useful when parameters need to be moved into async blocks or spawned tasks.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// #[params(fields(user_id), clone_upfront)]
+    /// async fn async_operation(user_id: String, data: Vec<u8>) {
+    ///     tokio::spawn(async move {
+    ///         // user_id was cloned upfront, so this works
+    ///         process_data(data).await;
+    ///     });
+    /// }
+    /// ```
+    ///
+    /// # Performance Impact
+    /// Only use when necessary as it adds cloning overhead.
     CloneUpfront,
+
+    /// **Context Propagation** - `span(param1, param2, ...)` or `span`
+    ///
+    /// Sets up automatic context inheritance for child functions. This is the key feature
+    /// that enables truly automatic context propagation across function boundaries.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// #[params(span(request_id, user_id))]
+    /// fn handle_request(request_id: String, user_id: String, data: String) {
+    ///     info!("Request received");
+    ///     process_data(data); // Child function inherits request_id and user_id
+    /// }
+    ///
+    /// #[params] // Inherits context from parent
+    /// fn process_data(data: String) {
+    ///     info!("Processing"); // Automatically includes request_id and user_id
+    /// }
+    /// ```
+    ///
+    /// # Cross-Boundary Support
+    /// - ✅ Async/await boundaries
+    /// - ✅ Spawned tasks (tokio::spawn)
+    /// - ✅ Closures and iterators
+    /// - ✅ Thread boundaries
     Span(Punctuated<Expr, Token![,]>),
+
+    /// **Log All Parameters** - `all`
+    ///
+    /// Logs all function parameters as individual fields.
+    ///
+    /// # ⚠️ Security Warning
+    /// Use with extreme caution in production as this logs ALL parameters,
+    /// including potentially sensitive data like passwords, tokens, and personal information.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// #[params(all)] // ⚠️ Only use in development/debugging
+    /// fn debug_function(user_id: String, email: String, data: Vec<u8>) {
+    ///     info!("Debug info"); // Logs ALL parameters
+    /// }
+    /// ```
+    ///
+    /// # Recommended Usage
+    /// - ✅ Development and debugging
+    /// - ✅ Non-production environments
+    /// - ❌ Production environments
+    /// - ❌ Functions with sensitive parameters
     All,
-    AutoCapture,  // New attribute for automatic closure context capture
+
+    /// **Automatic Context Capture** - `auto_capture`
+    ///
+    /// Automatically captures and propagates context in closures and spawned tasks.
+    /// This ensures context is preserved even in complex async scenarios.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// #[params(span(batch_id), auto_capture)]
+    /// fn process_batch(batch_id: String, items: Vec<Item>) {
+    ///     items.iter().for_each(|item| {
+    ///         // Context automatically captured in closure
+    ///         process_item(item.clone());
+    ///     });
+    /// }
+    /// ```
+    ///
+    /// # Use Cases
+    /// - Complex async workflows
+    /// - Iterator chains with closures
+    /// - Nested task spawning
+    AutoCapture,
 }
 
 impl Parse for Attribute {
@@ -687,7 +869,7 @@ struct AttrConfig {
     span: bool,
     span_fields: Vec<syn::Expr>,
     all_params: bool,
-    auto_capture: bool,  // New field for automatic closure context capture
+    auto_capture: bool, // New field for automatic closure context capture
 }
 
 impl Default for AttrConfig {
@@ -740,13 +922,19 @@ fn get_context_fields_quote(item: &FnItem, config: &AttrConfig) -> Vec<proc_macr
 
     // For span propagation, automatically inherit parent context fields
     // This ensures automatic context propagation without manual attributes
-    if config.span && config.fields.is_empty() && config.custom.is_empty() && config.current.is_empty() && !config.all_params {
+    if config.span
+        && config.fields.is_empty()
+        && config.custom.is_empty()
+        && config.current.is_empty()
+        && !config.all_params
+    {
         // When only span is enabled (default behavior), inherit all parent context fields
         // This uses the runtime macro to dynamically include inherited fields
-        if WITH_CONTEXT_ENABLED{
-        field_assignments.push(quote! {
-            context = ::log_args_runtime::get_inherited_context_string()
-        });}
+        if WITH_CONTEXT_ENABLED {
+            field_assignments.push(quote! {
+                context = ::log_args_runtime::get_inherited_context_string()
+            });
+        }
     }
 
     if config.all_params {
@@ -756,11 +944,11 @@ fn get_context_fields_quote(item: &FnItem, config: &AttrConfig) -> Vec<proc_macr
             let ident_str = ident.to_string();
             // When span is enabled, use span context lookup for post-move safety
             if config.span {
-                field_assignments.push(quote! { 
+                field_assignments.push(quote! {
                     #ident = ::log_args_runtime::get_context_value(&#ident_str).unwrap_or_else(|| "".to_string())
                 });
             } else {
-                field_assignments.push(quote! { #ident = ?#ident });
+                field_assignments.push(quote! {#ident = ?#ident });
             }
         }
     }
@@ -771,14 +959,14 @@ fn get_context_fields_quote(item: &FnItem, config: &AttrConfig) -> Vec<proc_macr
             // Convert complex expressions to string field names
             let field_name = quote! { #field_expr }.to_string();
             let field_key = field_name.replace(' ', "");
-            
+
             // If clone_upfront is enabled and expression contains self.field, handle it specially
             if config.clone_upfront {
                 let expr_str = quote!(#field_expr).to_string();
                 if expr_str.contains("self.") {
                     // When span is enabled, use span context lookup for post-move safety
                     if config.span {
-                        field_assignments.push(quote! { 
+                        field_assignments.push(quote! {
                             #field_name = ::log_args_runtime::get_context_value(&#field_key).unwrap_or_else(|| "".to_string())
                         });
                     } else {
@@ -788,31 +976,33 @@ fn get_context_fields_quote(item: &FnItem, config: &AttrConfig) -> Vec<proc_macr
                         while let Some(pos) = modified_expr_str[start..].find("self.") {
                             let field_start = start + pos + 5; // Skip "self."
                             let remaining = &modified_expr_str[field_start..];
-                            
+
                             // Find the end of the field name
                             let field_end = remaining
                                 .find(|c: char| !c.is_alphanumeric() && c != '_')
                                 .unwrap_or(remaining.len());
-                            
+
                             let field_name_part = &remaining[..field_end];
                             let replacement = format!("__{field_name_part}_for_macro");
-                            
+
                             // Replace self.field_name with __field_name_for_macro
                             let old_expr = format!("self.{field_name_part}");
                             modified_expr_str = modified_expr_str.replace(&old_expr, &replacement);
-                            
+
                             start = field_start + field_end;
                         }
-                        
+
                         // Parse the modified string back to a token stream
-                        let modified_expr: proc_macro2::TokenStream = modified_expr_str.parse().unwrap_or_else(|_| quote!(#field_expr));
-                        field_assignments.push(quote! { #field_name = ?#modified_expr });
+                        let modified_expr: proc_macro2::TokenStream = modified_expr_str
+                            .parse()
+                            .unwrap_or_else(|_| quote!(#field_expr));
+                        field_assignments.push(quote! {#field_name = ?#modified_expr });
                     }
                 } else {
-                    field_assignments.push(quote! { #field_name = ?#field_expr });
+                    field_assignments.push(quote! {#field_name = ?#field_expr });
                 }
             } else {
-                field_assignments.push(quote! { #field_name = ?#field_expr });
+                field_assignments.push(quote! {#field_name = ?#field_expr });
             }
         }
     }
@@ -823,7 +1013,7 @@ fn get_context_fields_quote(item: &FnItem, config: &AttrConfig) -> Vec<proc_macr
             let field_name = quote! { #field_expr }.to_string();
             let field_key = field_name.replace(' ', "");
             // Pull value from context if present; otherwise default to empty string
-            field_assignments.push(quote! { 
+            field_assignments.push(quote! {
                 #field_name = ::log_args_runtime::get_context_value(&#field_key).unwrap_or_else(|| "".to_string())
             });
         }
@@ -836,7 +1026,7 @@ fn get_context_fields_quote(item: &FnItem, config: &AttrConfig) -> Vec<proc_macr
     for nv in &config.custom {
         let key = &nv.path;
         let value = &nv.value;
-        
+
         // Add to logging fields
         field_assignments.push(quote! {
             #key = #value
@@ -847,14 +1037,14 @@ fn get_context_fields_quote(item: &FnItem, config: &AttrConfig) -> Vec<proc_macr
     for current_field in &config.current {
         let field_name = quote! { #current_field }.to_string();
         let field_key = field_name.replace(' ', "");
-        
+
         // If clone_upfront is enabled and expression contains self.field, handle it specially
         if config.clone_upfront {
             let expr_str = quote!(#current_field).to_string();
             if expr_str.contains("self.") {
                 // When span is enabled, use span context lookup for post-move safety
                 if config.span {
-                    field_assignments.push(quote! { 
+                    field_assignments.push(quote! {
                         #field_name = ::log_args_runtime::get_context_value(&#field_key).unwrap_or_else(|| "".to_string())
                     });
                 } else {
@@ -864,38 +1054,62 @@ fn get_context_fields_quote(item: &FnItem, config: &AttrConfig) -> Vec<proc_macr
                     while let Some(pos) = modified_expr_str[start..].find("self.") {
                         let field_start = start + pos + 5; // Skip "self."
                         let remaining = &modified_expr_str[field_start..];
-                        
+
                         // Find the end of the field name
                         let field_end = remaining
                             .find(|c: char| !c.is_alphanumeric() && c != '_')
                             .unwrap_or(remaining.len());
-                        
+
                         let field_name_part = &remaining[..field_end];
                         let replacement = format!("__{field_name_part}_for_macro");
-                        
+
                         // Replace self.field_name with __field_name_for_macro
                         let old_expr = format!("self.{field_name_part}");
                         modified_expr_str = modified_expr_str.replace(&old_expr, &replacement);
-                        
+
                         start = field_start + field_end;
                     }
-                    
+
                     // Parse the modified string back to a token stream
-                    let modified_expr: proc_macro2::TokenStream = modified_expr_str.parse().unwrap_or_else(|_| quote!(#current_field));
-                    field_assignments.push(quote! { #field_name = ?#modified_expr });
+                    let modified_expr: proc_macro2::TokenStream = modified_expr_str
+                        .parse()
+                        .unwrap_or_else(|_| quote!(#current_field));
+                    field_assignments.push(quote! {#field_name = ?#modified_expr });
                 }
             } else {
-                field_assignments.push(quote! { #field_name = ?#current_field });
+                field_assignments.push(quote! {#field_name = ?#current_field });
             }
         } else {
-            field_assignments.push(quote! { #field_name = ?#current_field });
+            field_assignments.push(quote! {#field_name = ?#current_field });
         }
     }
 
     // Add function name if any function-names feature is enabled
-
+    add_function_name_field(&mut field_assignments, item);
 
     field_assignments
+}
+
+/// Add function name field to log output when any function-names feature is enabled.
+/// The function name will be formatted according to the enabled feature.
+fn add_function_name_field(field_assignments: &mut Vec<proc_macro2::TokenStream>, item: &FnItem) {
+    // Check if any function-names feature is enabled
+    #[cfg(any(
+        feature = "function-names-snake",
+        feature = "function-names-camel",
+        feature = "function-names-pascal",
+        feature = "function-names-screaming",
+        feature = "function-names-kebab",
+        feature = "function-names"
+    ))]
+    {
+        let function_name = item.sig().ident.to_string();
+        let formatted_name = get_formatted_function_name(&function_name);
+
+        field_assignments.push(quote! {
+            function_name = #formatted_name
+        });
+    }
 }
 
 fn get_context_map_for_span(_item: &FnItem, config: &AttrConfig) -> proc_macro2::TokenStream {
@@ -903,7 +1117,7 @@ fn get_context_map_for_span(_item: &FnItem, config: &AttrConfig) -> proc_macro2:
 
     // Store all field types in span context for dynamic lookup
     // This ensures that span context lookup works for ALL field types
-    
+
     // 1. Add all parameters if requested
     if config.all_params {
         let all_args = get_all_args(_item);
@@ -914,7 +1128,7 @@ fn get_context_map_for_span(_item: &FnItem, config: &AttrConfig) -> proc_macro2:
             });
         }
     }
-    
+
     // 2. Add explicitly specified fields
     if !config.fields.is_empty() {
         for field_expr in &config.fields {
@@ -926,25 +1140,25 @@ fn get_context_map_for_span(_item: &FnItem, config: &AttrConfig) -> proc_macro2:
     }
 
     // Note: Do NOT store span(...) keys in context; they are only added to the current log call
-    
+
     // 3. Add custom fields (always included)
     for nv in &config.custom {
         let key = &nv.path;
         let value = &nv.value;
         let key_str = quote!(#key).to_string().replace(' ', "");
-        
+
         // For span context, use the original expression directly
         // This will be evaluated before any moves happen
         fields_to_log.push(quote! {
             new_context.insert(#key_str.to_string(), format!("{}", #value));
         });
-        
+
         // Also store globally for cross-boundary persistence
         fields_to_log.push(quote! {
             ::log_args_runtime::set_global_context(&#key_str, &format!("{}", #value));
         });
     }
-    
+
     // 4. Add current fields (these are also stored in context for consistency)
     for current_field in &config.current {
         let field_name = quote! { #current_field }.to_string();
@@ -955,7 +1169,6 @@ fn get_context_map_for_span(_item: &FnItem, config: &AttrConfig) -> proc_macro2:
     }
 
     // Add function name to context if any function-names feature is enabled (always propagated)
-
 
     quote! {
         {

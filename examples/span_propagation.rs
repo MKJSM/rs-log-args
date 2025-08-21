@@ -1,6 +1,6 @@
 use log_args::params;
-use tracing::{debug, info, Level};
 use tokio::task;
+use tracing::{debug, info, Level};
 
 fn init_subscriber() {
     tracing_subscriber::fmt()
@@ -16,7 +16,7 @@ async fn child() {
 }
 
 #[params(span(tenant_id, session_id))]
-async fn parent(tenant_id: String, session_id: String) {
+async fn parent(_tenant_id: String, _session_id: String) {
     info!("parent start");
 
     // Same-task propagation

@@ -11,7 +11,7 @@ fn init_subscriber() {
 
 // Only include selected parameters as fields
 #[params(span(tenant_id, session_id))]
-fn process_request(tenant_id: String, session_id: String, secret: String) {
+fn process_request(_tenant_id: String, _session_id: String, secret: String) {
     let _ = secret; // not logged
     info!("Processing request");
 }

@@ -1,6 +1,6 @@
 [package]
 name = "log_args"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 autotests = false
 authors = ["JS <mkjsm57@gmail.com>"]
@@ -35,12 +35,13 @@ with_context = []
 syn = { version = "2.0.104", features = ["full"] }
 quote = "1.0.40"
 proc-macro2 = "1.0.95"
-log-args-runtime.workspace = true
+log-args-runtime = { path = "../log-args-runtime", version = "0.1.4" }
 
 [dev-dependencies]
 futures = "0.3.31"
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json"] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }

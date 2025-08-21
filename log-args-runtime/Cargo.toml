@@ -1,6 +1,6 @@
 [package]
 name = "log-args-runtime"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 autotests = false
 authors = ["JS <mkjsm57@gmail.com>"]
@@ -16,8 +16,10 @@ categories = [
 ]
 
 [dependencies]
+once_cell = "1.19.0"
 serde_json = "1.0"
 tracing = "0.1.40"
+tracing-subscriber = { version = "0.3", features = ["json"] }
 tokio = { version = "1", features = ["rt", "macros"] }
 
 [features]

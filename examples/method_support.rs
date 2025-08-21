@@ -16,13 +16,15 @@ struct Service {
 impl Service {
     #[params(span(service_name), fields(op))]
     fn handle(&self, op: String) {
-        let service_name = self.name.clone();
+        let _service_name = self.name.clone();
         info!("handling op");
     }
 }
 
 fn main() {
     init_subscriber();
-    let svc = Service { name: "orders".into() };
+    let svc = Service {
+        name: "orders".into(),
+    };
     svc.handle("create".into());
 }

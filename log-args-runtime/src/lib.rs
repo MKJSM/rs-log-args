@@ -26,6 +26,7 @@
 //! }
 //! ```
 //!
+use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -35,8 +36,8 @@ use std::sync::{Arc, Mutex};
 pub const WITH_CONTEXT_ENABLED: bool = cfg!(feature = "with_context");
 
 // Global context store for cross-boundary persistence
-static GLOBAL_CONTEXT: std::sync::LazyLock<Arc<Mutex<HashMap<String, String>>>> =
-    std::sync::LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
+static GLOBAL_CONTEXT: Lazy<Arc<Mutex<HashMap<String, String>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 /// Set global context that persists across all boundaries
 pub fn set_global_context(key: &str, value: &str) {
@@ -57,8 +58,8 @@ pub fn get_global_context() -> Option<HashMap<String, String>> {
 
 // Thread-local storage for context stacks
 thread_local! {
-    static CONTEXT_STACK: RefCell<Vec<HashMap<String, String>>> = RefCell::new(Vec::new());
-    static ASYNC_CONTEXT_STACK: RefCell<Vec<HashMap<String, String>>> = RefCell::new(Vec::new());
+    static CONTEXT_STACK: RefCell<Vec<HashMap<String, String>>> = const { RefCell::new(Vec::new()) };
+    static ASYNC_CONTEXT_STACK: RefCell<Vec<HashMap<String, String>>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Guard for synchronous context that automatically pops on drop
@@ -174,34 +175,6 @@ impl Drop for AsyncContextGuard {
     }
 }
 
-// Helper macro to dynamically add context fields to log statements
-// This macro is now completely dynamic with no hardcoded field names
-#[macro_export]
-macro_rules! add_context_fields {
-    ($log_macro:path, $ctx:expr, $($args:tt)*) => {
-        // Completely dynamic approach - no hardcoded field names
-        // Create field tokens for all context fields dynamically
-        let mut field_tokens = Vec::new();
-
-        // Add all context fields dynamically without hardcoding any field names
-        for (key, value) in $ctx.iter() {
-            // Create a field token for any field name
-            let field_token = if key.contains('.') {
-                // Handle dotted field names (like "user.id")
-                format!("\"{key}\" = %{value}", key = key, value = value)
-            } else {
-                // Handle regular field names
-                format!("{key} = %{value}", key = key, value = value)
-            };
-            field_tokens.push(field_token);
-        }
-
-        // Note: This approach still has Rust macro limitations
-        // The field tokens can't be directly injected into the macro call
-        // This is kept for potential future use or alternative implementations
-    };
-}
-
 #[macro_export]
 macro_rules! log_with_context {
     ($log_macro:path, $context:expr, $($args:tt)*) => {
@@ -306,36 +279,13 @@ pub fn get_inherited_context_string() -> String {
 
     // Try async context stack (most likely to have the context)
     if let Ok(stack) = ASYNC_CONTEXT_STACK.try_with(|stack| stack.borrow().clone()) {
-        // Search through all contexts in the stack, not just the most recent
-        for context_map in stack.iter().rev() {
-            for (key, value) in context_map {
-                // Skip function name to avoid duplication
-                if key != "function"
-                    && !context_parts
-                        .iter()
-                        .any(|p: &String| p.starts_with(&format!("{key}=")))
-                {
-                    context_parts.push(format!("{key}={value}"));
-                }
-            }
-        }
+        fill_context_parts(&mut context_parts, &stack);
     }
 
     // Also try sync context stack and merge results
     CONTEXT_STACK.with(|stack| {
         let stack = stack.borrow();
-        for context_map in stack.iter().rev() {
-            for (key, value) in context_map {
-                // Skip function name and avoid duplicates
-                if key != "function"
-                    && !context_parts
-                        .iter()
-                        .any(|p: &String| p.starts_with(&format!("{key}=")))
-                {
-                    context_parts.push(format!("{key}={value}"));
-                }
-            }
-        }
+        fill_context_parts(&mut context_parts, &stack);
     });
 
     // If still no context, try global context store (for cross-boundary persistence)
@@ -395,4 +345,19 @@ pub fn get_inherited_fields_map() -> std::collections::HashMap<String, String> {
     }
 
     context_map
+}
+
+fn fill_context_parts(context_parts: &mut Vec<String>, stack: &[HashMap<String, String>]) {
+    for context_map in stack.iter().rev() {
+        for (key, value) in context_map {
+            // Skip function name to avoid duplication
+            if key != "function"
+                && !context_parts
+                    .iter()
+                    .any(|p: &String| p.starts_with(&format!("{key}=")))
+            {
+                context_parts.push(format!("{key}={value}"));
+            }
+        }
+    }
 }
